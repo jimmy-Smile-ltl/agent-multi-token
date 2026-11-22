@@ -1,0 +1,32 @@
+{
+  "_note": "占位模板——结构与 tokens.json 完全一致，值全是假的。真值写在同目录的 tokens.json（已被 .gitignore 排除）。",
+  "_source": "由 tokens.json 派生；改结构时两个文件一起改。",
+  "baseUrl": "https://relay.example.com/v1",
+  "models": [
+    "example-model-large",
+    "example-model-small"
+  ],
+  "tokens": [
+    {
+      "name": "relay-a",
+      "sk": "sk-REPLACE_ME_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "status": "ok",
+      "last_checked": "1970-01-01T00:00:00",
+      "detail": ""
+    },
+    {
+      "name": "relay-b",
+      "sk": "sk-REPLACE_ME_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "status": "no_quota",
+      "last_checked": "1970-01-01T00:00:00",
+      "detail": "示例：额度用完，用来测故障切换（cmt model next / cxt model next）"
+    },
+    {
+      "name": "relay-c",
+      "sk": "sk-REPLACE_ME_cccccccccccccccccccccccccccccccccccccccc",
+      "status": "invalid",
+      "last_checked": "1970-01-01T00:00:00",
+      "detail": "示例：令牌无效，用来测「四要素齐全但被服务端拒绝」这条路径"
+    }
+  ]
+}

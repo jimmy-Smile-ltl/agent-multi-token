@@ -1,0 +1,2165 @@
+/*
+ * 网页控制台的样式（工作台）。
+ *
+ * ─────────────────────────────────────────────────────────────
+ * ## ★★ 这个文件与姊妹项目的那份**逐字相同**
+ *
+ * ⇒ 这里不许出现工具名、环境变量名、契约节号（注释里也不行）。
+ *   同一份样式要能原样服务两个产品，所以一切都是**语义**的命名。
+ *
+ * ## 视觉：单色的机身 + 只属于状态的一点彩
+ *
+ * 一整屏表格里，"哪一条在做什么"是唯一要一眼看见的信息。所以机身
+ * （边框、按钮、页头、表头）全部取自一组**无彩**的变量，彩色只留给两处：
+ *
+ *   · 状态（八种命名色，明暗两套值都在本文件里）；
+ *   · 告警与确认（红/绿/琥珀的浅底）。
+ *
+ * 命名色而不是十六进制：**同一个名字在明暗两套里有两个值**。把 `#2f5cc4`
+ * 存进数据文件，到了暗色下就成了一块刺眼的小方块——而状态是存进
+ * `projects.json` 的，那份数据要跨明暗、跨显示器都读得下去。
+ *
+ * ## 机身是一套**有倾向的灰**，不是默认灰
+ *
+ * 全部中性色都朝同一个方向偏一点冷（蓝灰），明暗两套各自成一套色阶；
+ * 纯灰 + 纯黑/纯白是最容易显得"没配过色"的那种灰。状态色同样压过一档
+ * 饱和度——它们要在一屏里彼此分得开，但不该比内容更响。
+ * 另有一个 `--well`：比机身**再低一层**的"凹槽"，只给分段控件与下拉用，
+ * 让"可以在这里选"和"这里是一行字"在无彩的前提下也分得开。
+ *
+ * ## ★ 三个不使用变量的地方（都是有意的）
+ *
+ * ① 阴影里的黑色（`rgba(0,0,0,…)`）：它是"暗一层"，不是一种"颜色"；
+ * ② `::backdrop` 的遮罩：同上；
+ * ③ `.danger` / `.primary` 的字色用 `--surface` 而不是 `--ink` 的反相——
+ *    反相在明暗两套里**恰好**就是 surface 那个值，直接取它更不容易错。
+ * ─────────────────────────────────────────────────────────────
+ */
+
+/* ═══════════════════════════ 变量 ═══════════════════════════ */
+
+:root {
+  color-scheme: light dark;
+
+  /* ── 机身（无彩，偏冷的同一套灰）── */
+  --ground: #f5f6f8;
+  --surface: #ffffff;
+  --well: #eaedf3;
+  /* ★ 分隔线是这张表唯一的"结构"：行高 52px、正文 11px，线再淡一档，
+     一张二十行的大表就散成一片白；再深一档又成了 Excel 的格子。
+     它是"分层"，不是"围栏"。 */
+  --line: #e1e6ef;
+  --line-strong: #c8d0dc;
+  --ink: #171b23;
+  --muted: #5c6472;
+  --hover: #eef1f6;
+  --focus: rgba(23, 27, 35, 0.13);
+
+  /* ── 状态：字色与浅底，成对 ── */
+  --st-slate: #4d5867;
+  --st-slate-soft: #eef1f5;
+  --st-blue: #2f5cc4;
+  --st-blue-soft: #eaf0fc;
+  --st-teal: #10736a;
+  --st-teal-soft: #e1f3f0;
+  --st-green: #267244;
+  --st-green-soft: #e7f3eb;
+  --st-amber: #8f5a10;
+  --st-amber-soft: #fbf1de;
+  --st-red: #b03a38;
+  --st-red-soft: #fbeceb;
+  --st-purple: #6846bd;
+  --st-purple-soft: #f1ecfb;
+  --st-pink: #b0406e;
+  --st-pink-soft: #fceaf2;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+
+  /*
+   * 字体：**系统栈，但挑过**。不加载任何字体文件（也没有地方能加载，
+   * CSP 里根本没有 `font-src`）——所以能做的只有把候选排好、把字号字重
+   * 定死。这三件事恰好占观感的大头。
+   *
+   * ★ `Segoe UI Variable Text` 写死在最前：Win11 的系统 UI 字体有
+   *   Text / Display 两个光学尺寸，`system-ui` 会挑到 Display 那一个——
+   *   它在 12px 上下偏细、字宽偏紧，这正是"字体很丑"的来源。
+   * ★ 中文排在拉丁之后、泛型之前：让拉丁字符用英文字体，汉字落到雅黑，
+   *   而不是整行统一被拉成一种字体的形状。
+   * ★ mono 末尾也留中文字体：否则注释里的汉字会掉进泛型 `monospace`，
+   *   被拉成方块感的等宽汉字，和旁边的正文完全不像一套。
+   * ★ **不要** "Cascadia Code"：它默认开连字，`--` `->` `=>` 会被连成
+   *   单个符号——看代码可以，看表格里的密钥和模型 id 是灾难。
+   */
+  --mono: "Cascadia Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+          "Microsoft YaHei UI", "PingFang SC", monospace;
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+          "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0f1217;
+    --surface: #171b22;
+    --well: #0b0e12;
+    --line: #2c3441;
+    --line-strong: #3d4654;
+    --ink: #e8eaf0;
+    --muted: #99a2b1;
+    --hover: #20262f;
+    --focus: rgba(232, 234, 240, 0.17);
+
+    --st-slate: #a5aebd;
+    --st-slate-soft: #1e242d;
+    --st-blue: #8fb0ff;
+    --st-blue-soft: #182642;
+    --st-teal: #66d7c7;
+    --st-teal-soft: #10302d;
+    --st-green: #74d894;
+    --st-green-soft: #12291d;
+    --st-amber: #eab35c;
+    --st-amber-soft: #332510;
+    --st-red: #f49a9a;
+    --st-red-soft: #351b1c;
+    --st-purple: #c4aefc;
+    --st-purple-soft: #241c3c;
+    --st-pink: #f5a3c4;
+    --st-pink-soft: #331c27;
+  }
+}
+
+/*
+ * 颜色名 → 一对变量。
+ *
+ * ★ 只有这一处把"名字"和"值"接起来。所有用色的地方写 `var(--c)` 和
+ *   `var(--cs)`，于是加一种颜色 = 在上面补一对值 + 在下面补一行。
+ */
+[data-color="slate"] { --c: var(--st-slate); --cs: var(--st-slate-soft); }
+[data-color="blue"] { --c: var(--st-blue); --cs: var(--st-blue-soft); }
+[data-color="teal"] { --c: var(--st-teal); --cs: var(--st-teal-soft); }
+[data-color="green"] { --c: var(--st-green); --cs: var(--st-green-soft); }
+[data-color="amber"] { --c: var(--st-amber); --cs: var(--st-amber-soft); }
+[data-color="red"] { --c: var(--st-red); --cs: var(--st-red-soft); }
+[data-color="purple"] { --c: var(--st-purple); --cs: var(--st-purple-soft); }
+[data-color="pink"] { --c: var(--st-pink); --cs: var(--st-pink-soft); }
+
+/* ═══════════════════════════ 底子 ═══════════════════════════ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+/* ★ 这条**必须**在作者规则里且带 `!important`：`.banner` 之类自带
+   `display: flex`，HTML 上的 `hidden` 属性只是一个 UA 级的
+   `display: none`，作者样式一覆盖，藏起来的东西就回来了。 */
+[hidden] { display: none !important; }
+
+html,
+body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.busy { cursor: progress; }
+
+h1, h2, h3, h4 {
+  margin: 0;
+  font-weight: 600;
+  /* ★ 负字距是给"大号拉丁标题"的：中文本来就没有侧边距可压，收紧只会让
+     笔画贴在一起。这里保持 0——中文标题的疏密由字号本身决定。 */
+  letter-spacing: 0;
+}
+
+p { margin: 0; }
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* 屏幕阅读器专用（`<caption>` 这类"看得见就多余"的字） */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 复制兜底用的替身输入框：在视口里、但看不见 */
+.offscreen {
+  position: fixed;
+  top: 0;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.mono { font-family: var(--mono); }
+
+.grow { flex: 1 1 auto; min-width: 0; }
+
+/* ═══════════════════════════ 控件 ═══════════════════════════ */
+
+button {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--muted);
+}
+
+button:active:not(:disabled) { transform: translateY(0.5px); }
+
+button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--ink);
+  border-color: var(--ink);
+  opacity: 0.88;
+}
+
+button.danger {
+  background: var(--st-red);
+  color: var(--surface);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+button.danger:hover:not(:disabled) {
+  background: var(--st-red);
+  border-color: transparent;
+  opacity: 0.9;
+}
+
+/* 行内小按钮。★ 表格里一律用它——默认尺寸会把每一行撑得比信息本身还重。 */
+button.mini {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+/* 幽灵按钮：平时不占视觉重量，悬停才浮出来 */
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+button.ghost:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+button.danger-ghost:hover:not(:disabled) {
+  color: var(--st-red);
+  background: var(--st-red-soft);
+  border-color: transparent;
+}
+
+button.big {
+  padding: 9px 18px;
+  font-size: 13px;
+}
+
+/* 文字按钮（左栏那两条） */
+button.linkish {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+button.linkish:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+button.wide {
+  width: 100%;
+  text-align: center;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+select:focus {
+  outline: none;
+  border-color: var(--muted);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+input[type="text"]::placeholder,
+input[type="password"]::placeholder { color: var(--muted); opacity: 0.75; }
+
+input[type="password"] { font-family: var(--mono); letter-spacing: 0.08em; }
+
+input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+/* ═══════════════════════════ 骨架 ═══════════════════════════ */
+
+.shell {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  height: 100dvh;
+}
+
+/* ── 左栏 ── */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  padding: 18px 12px 14px;
+  background: var(--ground);
+  border-right: 1px solid var(--line);
+  overflow: auto;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 8px 16px;
+}
+
+.brand .mark {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.brand .sub {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+/* ── 视图切换（项目 / 资源） ──
+   两格等宽的**分段控件**：底下垫一条浅槽，选中的那一格浮起来。
+   ★ 它不是"按钮组"，是"一个控件两种状态"——所以没有间距，只有一条细缝。 */
+
+.views {
+  display: flex;
+  gap: 2px;
+  margin: 0 4px 14px;
+  padding: 2px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.view-tab {
+  flex: 1 1 0;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.view-tab:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--hover);
+  border-color: transparent;
+}
+
+.view-tab.is-on {
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.view-tab.is-on:hover:not(:disabled) { background: var(--surface); }
+
+.side-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 12px;
+}
+
+.side-head {
+  padding: 6px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  /* ★ 小号中文标签的字距上限就是 0.04em：再大就散成"一 个 字 一 个 字"，
+     那是排版事故，不是"显得高级"。 */
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* ── 状态筛选 ── */
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.filt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.filt:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.filt.is-on {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.filt .dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c, var(--line-strong));
+}
+
+.filt .dot.all { background: var(--muted); }
+
+.filt .fname {
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.filt .fcount {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.filt.is-on .fcount { color: var(--ink); }
+
+/* ── 左栏底部：当前目录 + 退出 ── */
+
+.side-tail {
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* ★ 最多两行。路径的全文在表格「当前目录」那一行里，这条**自己也带 `title`**
+   （见 `app.js` 的 `paintCwd`）——夹行丢掉的尾巴必须有个出口。
+   不夹的话一条深路径能在左栏底部撑出三行，把「退出」按钮推来推去——而它就在正下方。 */
+.side-tail .cwd {
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* ── 右栏 ── */
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* ★ 上下内边距比看起来该给的更紧：h1 有 22px，行高撑起的头部高度
+     本身已经比表格的 52px 行重，再垫厚内边距会让"标题区"压过"数据区"。 */
+  padding: 13px 20px 11px;
+}
+
+.top-title {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.top h1 { font-size: 22px; }
+
+.count-chip {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  /* ★ 底色取 surface 而不是 ground：头部本来就在 surface 上，ground 比它
+     还浅，pill 会"消失在背景里"只剩一圈描边。surface + line 在两套主题里
+     都能看出"这是一枚贴在标题旁的小圆牌"。 */
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── 提示条 / 确认横幅 ── */
+
+.flash {
+  margin: 0 20px 8px;
+  padding: 8px 11px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.flash.inline { margin: 0 0 10px; }
+
+.flash.bad {
+  color: var(--st-red);
+  background: var(--st-red-soft);
+  border-color: transparent;
+  border-left-color: var(--st-red);
+}
+
+.flash.good {
+  color: var(--st-green);
+  background: var(--st-green-soft);
+  border-color: transparent;
+  border-left-color: var(--st-green);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 20px 8px;
+  padding: 9px 11px;
+  background: var(--st-amber-soft);
+  border: 1px solid transparent;
+  border-left: 3px solid var(--st-amber);
+  border-radius: var(--radius-sm);
+}
+
+.banner-text {
+  font-size: 12px;
+  color: var(--st-amber);
+}
+
+/* ── 内容区 ── */
+
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#screen-list,
+#screen-resources {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#screen-wizard {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 20px 24px;
+}
+
+/* ═══════════════════════════ 表格（项目 / 资源） ═══════════════════════════ */
+
+.tablewrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+
+/* ★ 两张表共用骨架，**列宽各管各的**：`.c-*` 只描述项目表，`.r-*` 只描述资源表。
+   共用一个类名会在"窄屏藏某一列"的规则上互相误伤。 */
+.grid,
+.res-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.grid thead th,
+.res-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-align: left;
+  white-space: nowrap;
+  background: var(--ground);
+  border-bottom: 1px solid var(--line);
+}
+
+.grid tbody td,
+.res-grid tbody td {
+  height: 52px;
+  padding: 6px 12px;
+  line-height: 1.45;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ★ 首尾两列跟页边对齐到同一条竖线（20px = `.top` 与 `.flash` 的左右内边距）。
+   少了这条，表头第一格会缩进 12px 而上面的大标题在 20px 处——
+   两行字看着"差一点点"，那种错位比多留 8px 难看得多。 */
+.grid thead th:first-child,
+.res-grid thead th:first-child,
+.grid tbody td:first-child,
+.res-grid tbody td:first-child { padding-left: 20px; }
+
+.grid thead th:last-child,
+.res-grid thead th:last-child,
+.grid tbody td:last-child,
+.res-grid tbody td:last-child { padding-right: 20px; }
+
+.grid tbody tr:hover td,
+.res-grid tbody tr:hover td { background: var(--hover); }
+
+/* 悬停行的下边线跟着变深一档：行高 52px、行距只有 1px 的分隔线，
+   悬停底色若不把线一起抬起来，白底上行与行会"糊"在一起。 */
+.grid tbody tr:hover td,
+.res-grid tbody tr:hover td { border-bottom-color: var(--line-strong); }
+
+/* 「当前目录」：全表唯一的"你在这里" */
+.grid tbody tr.is-cwd td { background: var(--ground); }
+.grid tbody tr.is-cwd:hover td { background: var(--hover); }
+.grid tbody tr.is-cwd td:first-child { box-shadow: inset 3px 0 0 var(--ink); }
+
+/* ★ 列宽是**预算**，不是五个独立的数：1280 的窗口减去左栏 232 之后，
+   这五列占掉多少，剩下的全归「目录」。所以每一次收紧都是为了把像素让给路径——
+   它是这张表里唯一不可预知长度的一列（Windows 的深路径可以长到 80 个字符），
+   而状态、模型、操作三列的长度是有上限的。
+   收紧前后：状态 120→116、身份 172→164、服务端 244→216、模型 150→144、操作 150→132，
+   目录因此从 212px 涨到 276px——多出来的 64px 正好是"两行放得下"与"三行"的分界。 */
+.grid .c-status { width: 116px; }
+.grid .c-token { width: 164px; }
+.grid .c-url { width: 216px; }
+/* ★ `max-width` 与 `width` 一起写：`width` 在自动表格布局里只是"建议"，
+   真正定宽的是单元格的 min-content——一个 `white-space: nowrap` 的模型 id
+   会把这一列撑到能放下它全长，然后从「目录」那一列偷走 40 多像素。
+   `max-width` 才是硬约束，配合下面 `.model-pick` 的 `min-width: 0` 一起用。 */
+.grid .c-models { width: 144px; max-width: 144px; }
+.grid .c-ops { width: 132px; }
+
+/* ── 状态下拉 ── */
+
+.status-pick {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.status-pick .status-select {
+  appearance: none;
+  -webkit-appearance: none;
+  max-width: 100%;
+  padding: 4px 21px 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c, var(--st-slate));
+  background: var(--cs, var(--st-slate-soft));
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.status-pick .status-select:hover:not(:disabled) { border-color: currentColor; }
+
+.status-pick .status-select:focus { box-shadow: 0 0 0 3px var(--focus); }
+
+/* 自绘的小三角。★ `pointer-events: none` 是必需的——它压在 `<select>` 上，
+   不关掉的话点这一角就没反应（正好是用户最习惯点的那个角）。 */
+.status-pick::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  width: 0;
+  height: 0;
+  margin-top: -1.5px;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid var(--c, var(--st-slate));
+  pointer-events: none;
+}
+
+.dash { color: var(--line-strong); }
+
+/* ── 目录 ── */
+
+.target-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chip {
+  align-self: flex-start;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.chip.cwd { color: var(--ink); border-color: var(--line-strong); }
+
+/*
+ * ★★ `overflow-wrap: anywhere` 而**不是** `word-break: break-all`。
+ *
+ * `break-all` 会把每行**填满到最后一个字符**，于是 `<wbr>` 白放了，
+ * 路径断成 `…\python cod` / `e\Spider`。`anywhere` 只在"这一段实在放不下"
+ * 时才在词内硬切，能用的折行点（`<wbr>`、空格）优先——这正是那一串
+ * `<wbr>` 存在的理由。
+ *
+ * ★★ 夹到**两行**（`-webkit-box` + `line-clamp`）。这不是"少显示一点"，
+ * 是**行高节奏**：`td` 写死 52px 只能定下限，一条 90 字符的深路径能把它顶到
+ * 4 行（≈ 130px），于是同一张表里第 1 行是第 2 行的两倍高，扫读的锚点全乱。
+ * 全文在 `title` 里，鼠标停一下就看得见——用省略号换整齐，这笔交易在这张表上划算。
+ * ⚠️ 只对**块级**元素有效：`td` 上写 `display: -webkit-box` 会把它变成
+ * 非表格单元格，整张表当场散架（所以 `.url-cell` 那一格没有夹）。
+ */
+.target {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* ── 身份 ── */
+
+.ident {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ident-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ident-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* 打码密钥是**数据**，不是注解——11px 与表格里其余 mono 文本（路径、URL）同档。
+   再小一档它就只是"一行灰点"，而它恰好是这一列存在的理由。 */
+.ident-key {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ident-src {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── 服务端地址 ── */
+
+.url-cell {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ── 模型下拉 ──
+   ★ 与状态下拉同一个做法（`appearance: none` + 自绘三角），但**不加彩色**：
+   状态是"这一行归谁管"，模型是"这一行跑什么"——后者每行都可能不同，
+   上了色整张表会变成一排色块。 */
+
+.model-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* 三角挂在这一层：`.model-pick` 里还有一个 `+N` 小标，三角若按外层定位
+   就会压到小标上。 */
+.model-box {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.model-select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 21px 4px 8px;
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.model-select:hover:not(:disabled) { border-color: var(--line-strong); }
+
+.model-select:focus { box-shadow: 0 0 0 3px var(--focus); }
+
+.model-select:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* 自绘的小三角。`pointer-events: none` 是必需的——它压在 `<select>` 上，
+   不关掉的话点这一角就没反应（正好是用户最习惯点的那个角）。 */
+.model-box::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 0;
+  height: 0;
+  margin-top: -1.5px;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid var(--muted);
+  pointer-events: none;
+}
+
+/* 「后面还有 N 个」。下拉只看得到当前生效的那一个，这枚小标是
+   "它其实还排着别的"的唯一提示。 */
+.model-more {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ── 操作 ── */
+
+/* ★ 左对齐，不是右对齐。右对齐时「启动」的 x 会**随着「删除」在不在而左右跳**
+   （只有一行的项目和两行都有按钮的项目，那个按钮差 48px）——鼠标移过去点空一次
+   就知道有多难受。动作列按"第一个按钮固定在离内容最近的那一侧"来排，
+   窄屏（≤859px）本来也是这个方向，两个断点因此说同一句话。 */
+.ops {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+/* ═══════════════════════════ 需要你处理 ═══════════════════════════ */
+
+/* ★ 列表屏顶部那一块"现在轮到你什么"。健康时整块 hidden——不占一行。
+   底色取井色（比表面深一档），与下面的表格分开、又不抢眼。 */
+.attention {
+  flex: 0 0 auto;
+  padding: 10px 20px 6px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ground);
+}
+
+.att-head {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.att-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 10px;
+  margin-bottom: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+/* 严重度点：颜色走 `[data-color]` 的 `--c` 桥，不新增颜色。 */
+.att-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--c, var(--muted));
+}
+
+.att-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.att-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.att-detail {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.att-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ═══════════════════════════ 会话条 ═══════════════════════════ */
+
+/* ★ 资源屏顶部的"现在有谁在跑"（面板 · 会话在场层）。与概览条同一层：
+   钉在表格上方、不跟表格滚。内容由 `paintSessions()` 填；
+   没有活会话时整条 `hidden`，全部健康且无未读时折叠成一行文字。 */
+.res-sessions {
+  flex: 0 0 auto;
+  padding: 8px 20px 4px;
+}
+
+.res-sessions-line {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.res-session-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+/* 身份状态的小圆点：颜色走 `[data-color]` 那套 `--c` 桥，不新增颜色。 */
+.ses-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c, var(--muted));
+}
+
+.ses-token {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.ses-cwd {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ses-warn {
+  flex: none;
+  font-size: 11px;
+  color: var(--c, var(--muted));
+  white-space: nowrap;
+}
+
+/* 未读徽章靠右；`margin-left: auto` 把它与「全部标已读」一起推到行尾。 */
+.ses-unread { margin-left: auto; flex: none; }
+
+/* 已关闭（可恢复）的行：底色让位，live 的行保持视觉优先。 */
+.res-session-row.is-closed {
+  background: transparent;
+  border-style: dashed;
+}
+
+.ses-closed {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════ 资源概览条 ═══════════════════════════ */
+
+/* ★ 钉在表格上方、**不跟着表格滚**：`.tablewrap` 才是滚动容器，所以这一条
+   在 `.pane` 的纵向流里 `flex: 0 0 auto`。概览回答的是"整张表现在什么情况"，
+   滚到第 20 行还得看得见。
+   ★ 底色取地面色，与吸顶表头同一层墨——两处看着像同一条带子的两端。
+   ★ 内容全由 `paintSummary()` 填，空池时整条 `hidden`（不占高度）。 */
+.res-summary {
+  flex: 0 0 auto;
+  padding: 9px 20px;
+  background: var(--ground);
+  border-top: 1px solid var(--line);
+}
+
+/* 一行；放不下就换行，而不是把数字挤出屏幕。`baseline` 让大小不一的数字
+   与小标签坐同一条基线——`align-items: center` 在混排字号下会显得上下不齐。 */
+.sum-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sum-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.sum-label { font-size: 11px; color: var(--muted); }
+
+.sum-value {
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* 池状态计数：与行里那枚状态丸同一套 `[data-color]` 墨，**不新增颜色**。 */
+.sum-count {
+  padding: 0 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--c, var(--st-slate));
+  background: var(--cs, var(--st-slate-soft));
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* 分隔：左边是"池里现在什么情况"（状态），右边是"花了多少"（用量）——
+   两件事，用一道竖线分开，比多空一格更清楚。 */
+.sum-sep {
+  align-self: center;
+  width: 1px;
+  height: 12px;
+  background: var(--line-strong);
+}
+
+/* 提示：至多两条（服务端已截断）。★ 行首那个琥珀点是**这一块唯一的颜色**——
+   它标记"值得看一眼"，句子本身仍是灰的：概览条不该比表格更吵。
+   ★ 不用 emoji：整页的墨是那套 `--st-*`，一个彩色字形会自成一套。 */
+.sum-insight {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.sum-insight::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 6px;
+  vertical-align: 1px;
+  background: var(--st-amber);
+  border-radius: 50%;
+}
+
+/* ═══════════════════════════ 资源表 ═══════════════════════════ */
+
+/* ★ 这七列**只属于资源表**（`.r-*`），与项目表那组互不相干——
+   两张表的列宽、隐藏时机都不一样。
+   ★ 这里的 `width` 只是"建议值"：自动表格布局下真正的下限来自单元格内容的
+     min-content，所以下面每一格都得自己管住 `min-width: 0` 与省略号。
+   ★ 加列时重算这笔账：这七列合计 ≈ 1036px，而 1280 宽窗口扣掉左栏后
+     表格区约 1048px——刚好不留横向滚动条。`.res-grid` **没有**一个 `auto` 列，
+     超出的部分只能靠 min-content 硬挤，挤不动就整表横向滚。 */
+.res-grid .r-ident { width: 216px; }
+.res-grid .r-url { width: 228px; }
+.res-grid .r-priority { width: 216px; }
+.res-grid .r-count { width: 76px; }
+.res-grid .r-usage { width: 104px; }
+.res-grid .r-cost { width: 96px; }
+.res-grid .r-ops { width: 100px; }
+
+/* ── 身份：打码密钥（主） · 昵称 · 机器名（次） ──
+   ★ 这是**两张表里唯一带输入框的单元格**——"我认得它"和"我想叫它什么"
+     本来就是同一眼看的东西，分成两列会让视线来回跳。
+   ★ 输入框平时不描边：一列框全都框起来的话，这张表看着像一张表单，
+     而不是一份可以顺手改两笔的清单。 */
+.res-ident {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.res-ident-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+/* 打码密钥：这一行里**最重**的东西——用户认的就是它，不是它的名字。 */
+.res-key {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* 机器名：身份真正的唯一标识，但不是用户先看的东西，所以退到后半行、降一档。 */
+.res-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── 池状态丸（token 池）──
+   ★ 它是**一枚下拉**，不是普通标签：用户既看它（这把 key 还能不能用），
+     也用它（手动标一档，比如"我确认这个月用完了"）。
+     候选与配色都来自 `[data-color]` 那 8 个 `--st-*`，**没有新颜色**。
+   ★ 尺寸比项目表那枚状态丸小一档（10px / 高 16px）：它挂在一行身份的后半段，
+     那里已经有打码密钥和机器名两样东西，再摆一枚 11px 的丸会把这一行撑高。 */
+.pool-pick {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.pool-pick .pool-pill {
+  appearance: none;
+  -webkit-appearance: none;
+  max-width: 92px;
+  padding: 1px 15px 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--c, var(--st-slate));
+  background: var(--cs, var(--st-slate-soft));
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.pool-pick .pool-pill:hover:not(:disabled) { border-color: currentColor; }
+.pool-pick .pool-pill:focus { box-shadow: 0 0 0 3px var(--focus); }
+
+/* 自绘的小三角。★ `pointer-events: none` 是必需的——它压在 `<select>` 上，
+   不关掉的话点这一角就没反应（与 `.status-pick::after` 同一条）。 */
+.pool-pick::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 0;
+  height: 0;
+  margin-top: -1.5px;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 3.5px solid var(--c, var(--st-slate));
+  pointer-events: none;
+}
+
+/* ★ 两条类名一起写：通用那条是 `input[type="text"]`（一个属性选择器，
+   权重与类相同、并且比这里靠前），单靠 `.res-label` 压不住它的边框与内边距。 */
+.res-ident .res-label {
+  width: 100%;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.res-ident .res-label::placeholder { color: var(--muted); opacity: 0.6; }
+
+.res-ident .res-label:hover:not(:focus) {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.res-ident .res-label:focus {
+  background: var(--surface);
+  border-color: var(--muted);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.res-url {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ★ 与项目表的路径同一条纪律：夹两行。这一格底下还有一行 `.res-meta`
+   （「未拉取」/ 拉取时间 /「地址已变」），地址若自己长到三四行，那一行就被顶出格底，
+   行高跟着参差——三行时整行 ≈ 77px，比邻行高出一大截。
+   夹两行之后最坏 ≈ 61px（单行 52px），差 9px：扫读时看不出台阶，
+   而三行那 25px 的落差一眼就能看见。**省略号必须配一个出口**——
+   全文在 `title` 里（`app.js` 那一行），与 `.target` 用的是同一条规矩。 */
+.res-url-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.res-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+/* 「地址已变」：清单是旧地址上拉的。★ 用琥珀而不是红——它不是一个错误，
+   只是"该重拉一遍"的提示。 */
+.res-stale {
+  padding: 0 6px;
+  font-weight: 600;
+  color: var(--st-amber);
+  background: var(--st-amber-soft);
+  border-radius: 999px;
+}
+
+.res-when { font-variant-numeric: tabular-nums; }
+
+/* ── 用量 / 花费 ──
+   ★ 两格都**只画**服务端算好的数（`paintSummary()` 上面那段注释）。列宽很紧，
+     所以各自夹两行：主数 + 小字明细；再塞不下的都进 `title`。 */
+.res-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.res-calls {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* `输入 / 输出`。栏目只有 104px，所以不写「入」「出」两个字——
+   两行都是数、`title` 里有全量说明，读者看得出这是两个数。 */
+.res-split {
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.res-money {
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* 查不到价：`—` 比数字弱一档——它**不是 0**，是"不知道"。
+   与 `res-none`（「未拉取」那类）同一层墨，两种"没有"长得一样是刻意的。 */
+.res-money.none { font-weight: 400; color: var(--muted); }
+
+/* 模型清单：**单行**，塞不下就各自省掉尾巴（鼠标停上去看全文）。
+   让它换行的话，一个清单长得多的身份会把整行撑成两倍高——同一张表里
+   行高参差，扫读的成本比省略号高得多。 */
+.res-models {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.res-model {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  /* ★ 11px + 井底色：模型优先级是这张表里与"身份"对望的第二主角，
+     10.5px 时它弱得只剩一排灰点。井底比地面深一档，
+     芯片从行背景里浮起来，两套主题里都是"凹进一格"的感觉。 */
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.res-plus {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.res-none { font-size: 10.5px; color: var(--muted); }
+
+/* ── 模型优先级：整格是一颗按钮 ──
+   ★ 用 `button` 而不是 `div`：键盘 Tab 停得上去、回车打得开，而且"能点"
+     这件事由元素本身说出来，不靠一个悬停才出现的小图标去暗示。 */
+.res-models-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  max-width: 100%;
+  padding: 3px 6px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+}
+
+.res-models-btn:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+/* 「继承」：这一格显示的**不是自己的声明**，而是跟着全局默认那份走。
+   ★ 虚线框：它和旁边那些"自己的"不是一个来源，边框本身就是这句话。 */
+.res-tag {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  font-size: 10.5px;
+  line-height: 1.7;
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* 「同网关不同」：同一台服务端下几个身份的顺序不一致。
+   ★ 这是"我明明统一过"这类疑问的**唯一答案**，所以它得比模型 id 响。 */
+.res-badge {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--st-amber);
+  background: var(--st-amber-soft);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.res-grid tbody td.r-count {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* ── 空表 ── */
+
+/* ★ 选择器要压过 `.grid tbody td` 那条（它设了 `height: 52px` 与内边距）：
+   比类名数量，`.grid .empty-row td` 才赢。 */
+.grid .empty-row td,
+.res-grid .empty-row td {
+  height: auto;
+  padding: 56px 20px;
+  text-align: center;
+}
+
+.empty-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.empty-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ═══════════════════════════ 向导 ═══════════════════════════ */
+
+.wizard-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 0 14px;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--ground);
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.steps li .n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.steps li.active {
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+.steps li.active .n {
+  color: var(--surface);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.steps li.done .n {
+  color: var(--st-green);
+  border-color: var(--st-green);
+}
+
+.steps li.done { color: var(--muted); }
+
+/* ── 四节 ── */
+
+.fieldsets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 940px;
+}
+
+fieldset {
+  margin: 0;
+  padding: 6px 16px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  scroll-margin-top: 12px;
+}
+
+/* ★ 没走到的和走完的都 `disabled`（判据只有 `steps[].state` 一处），
+   所以"走完"要比"还没到"亮一档——否则回头看不出进度。 */
+fieldset[disabled] { opacity: 0.5; }
+fieldset[disabled][data-done] { opacity: 0.82; }
+
+legend {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+legend .n {
+  margin-right: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 0;
+}
+
+.field .lab {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.hint.bad { color: var(--st-red); }
+.hint.good { color: var(--st-green); }
+
+.pathrow {
+  display: flex;
+  gap: 6px;
+}
+
+.pathrow input { flex: 1 1 auto; font-family: var(--mono); font-size: 12px; }
+
+#path-dirs {
+  width: 100%;
+  min-height: 128px;
+  padding: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+#path-dirs option { padding: 3px 6px; border-radius: 4px; }
+
+.row-ops {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.inline {
+  display: flex;
+  gap: 6px;
+}
+
+.inline input { flex: 1 1 auto; }
+
+.newbox {
+  margin-top: 10px;
+  padding: 4px 14px 10px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* ── 模型两栏 ── */
+
+.cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 6px 0 10px;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.col h4 {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.checks,
+.picked {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.checks { max-height: 232px; overflow: auto; }
+
+.checks li label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.checks li label:hover { background: var(--hover); }
+
+.picked li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+.picked li:hover { background: var(--hover); }
+
+.picked .rank {
+  min-width: 18px;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-line {
+  padding: 8px 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── 落点摘要 ── */
+
+.summary {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 7px 18px;
+  margin: 8px 0 2px;
+}
+
+.summary dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.summary dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+/* ═══════════════════════════ 底栏 ═══════════════════════════ */
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 9px 20px;
+  font-size: 10.5px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.foot .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--st-green);
+}
+
+/* ═══════════════════════════ 对话框 ═══════════════════════════ */
+
+dialog.sheet {
+  width: min(600px, calc(100vw - 28px));
+  max-height: min(82dvh, 760px);
+  margin: auto;
+  padding: 18px 20px 0;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+  overflow: auto;
+}
+
+dialog.sheet::backdrop { background: rgba(8, 11, 17, 0.55); }
+
+dialog.sheet h2 {
+  font-size: 15px;
+  margin-bottom: 3px;
+}
+
+dialog.sheet .hint { padding-top: 6px; }
+
+.status-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.srow {
+  display: grid;
+  grid-template-columns: 12px 92px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.srow .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c, var(--st-slate));
+}
+
+.srow .srow-color {
+  padding: 5px 6px;
+  font-size: 11px;
+}
+
+.srow .srow-label {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.file-hint {
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.sheet-ops {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 0 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+/* ── 模型优先级 ── */
+
+/*
+ * 「正在改的是谁」。这一行比周围的说明文字重一档：对话框标题只说"模型优先级"，
+ * 真正回答问题的是它——我改的是哪一把 key。
+ */
+.prio-who {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/*
+ * ★ 这里的每一行都**不是**表单里的一条记录，而是"顺序"本身——
+ *   所以序号在最左边、最贴近数字的列宽，模型 id 占满剩下的全部。
+ *   顺序就是优先级，第一个是默认模型；这一句靠排版说出来，不靠说明文字。
+ */
+.pr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.prow {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+/* 序号用等宽数字，两位数（⑩ 往后）才不会把 id 推出去 */
+.prow-n {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  text-align: right;
+}
+
+.prow-id {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.prow .mini { padding: 4px 7px; }
+
+.pr-addrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.pr-addrow input { flex: 1 1 auto; }
+
+/* ── 环境变量编辑器 ── */
+
+/*
+ * JSON 草稿的画布。等宽字体（变量名与值是"代码"，不是文案）；`rows` 只是
+ * 初始高度，`resize: vertical` 让长清单自己长——`100%` 宽跟着对话框走。
+ * 底色与 `.srow` / `.prow` 同一块 `--ground`：它和它们是同一层的"草稿容器"。
+ */
+#env-text {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 180px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+/*
+ * 「同网关一并套用」。
+ * ★ 只有真有邻居时才出现（`gatewayCount < 2` 时整条 `hidden`）——
+ *   一个永远打不了勾的复选框比没有它更让人困惑。
+ */
+.pr-gate {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--well);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.pr-gate input { flex: 0 0 auto; }
+
+/* ═══════════════════════════ 窄窗口 ═══════════════════════════ */
+
+/*
+ * 列不够宽时从"最不影响判断"的那一列开始丢：
+ *   ① @1080 服务端地址——同一批项目多半共用同一个，左栏不会因为它而看错；
+ *   ② @920  身份——目录本身往往就说明了它是谁。
+ *
+ * ★ 模型下拉**不丢**。它现在是这张表上唯一的"当场改"入口，1080 的笔电上
+ *   恰恰最需要它；宁可让表格自己在框里横向滚。
+ */
+@media (max-width: 1080px) {
+  .grid .c-url,
+  .grid td.url-cell { display: none; }
+}
+
+@media (max-width: 920px) {
+  .grid .c-token,
+  .grid td.ident-cell { display: none; }
+
+  /* 资源表这边先丢**服务端地址**：一批身份多半挂在同一台网关上，而这一列
+     又最宽。★ 不丢身份——打码密钥与昵称现在是同一格，丢了就没有"这是谁"了。 */
+  .res-grid .r-url { display: none; }
+
+  /* 再丢**用量**（合计口径的「输入 / 输出」）。★ 留着「花费」：
+     花费是这一屏最想要的那个数，而用量的总量在概览条里一直看得见
+     ——概览条不参与折叠，它是这一屏唯一"永远在"的解释。 */
+  .res-grid .r-usage { display: none; }
+}
+
+/*
+ * 左栏折到顶上。
+ *
+ * ★ 这里把 `.shell` 的高度放开（`auto`）：纵向的 100% 高度配上"表自己在
+ *   里面滚"，在窄屏上会挤出一个只有一两行高的表格区域。窄屏就整页滚。
+ */
+@media (max-width: 859px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  /*
+   * ★ 这一档把"栏"压成"条"，条是要占纵向空间的——它每高一行，表格就少一行。
+   *   所以顶部这几块一律收紧：「状态」「当前目录」两个小标题**不画**（下面的
+   *   一排药丸和一个路径自己说得清），导航整块改成横排，路径只留一行。
+   */
+  .side {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 10px 12px 6px;
+    gap: 0;
+    overflow: visible;
+  }
+
+  .brand { padding-bottom: 8px; }
+
+  .side > nav.side-block {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding-bottom: 6px;
+  }
+
+  .side > nav.side-block .side-head { display: none; }
+
+  .filters {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .filt { width: auto; border-color: var(--line); background: var(--surface); }
+
+  .filt .fname { max-width: 8em; }
+
+  .side-tail {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-top: 0;
+    padding-top: 6px;
+  }
+
+  .side-tail .side-head { display: none; }
+
+  /*
+   * ★ 顶栏这条只留**一行**：路径的全文在表格「当前目录」那一行里（外加 `title`），
+   *   这里只是个提示，两行会把右边那颗按钮顶下去、把整条护边撑高。
+   *
+   * ⚠️ 只把 `-webkit-line-clamp` 从 2 收到 1，**别**改成 `display: block` +
+   *   `white-space: nowrap` 去要一个"真正的一行"：路径里插了 `<wbr>`
+   *   （见 `app.js` 的 `paintCwd`），而 Chromium 让 `<wbr>` **顶着 `nowrap`
+   *   照样断行**——实测 380px 的盒子里 `nowrap` 仍然排出两行、高 30px。
+   *   夹行是这里唯一可靠的办法，它的省略号由夹行本身给出，不依赖 `text-overflow`。 */
+  .side-tail .cwd {
+    flex: 1 1 auto;
+    padding: 0;
+    -webkit-line-clamp: 1;
+  }
+
+  .side-tail button.wide { width: auto; }
+
+  .pane { min-height: 0; }
+
+  .body { min-height: 0; }
+  #screen-list,
+  #screen-resources { min-height: 0; }
+  .tablewrap { overflow: auto; }
+
+  .top { padding: 12px 14px 8px; }
+  .flash,
+  .banner { margin-left: 14px; margin-right: 14px; }
+
+  /*
+   * ★ 页边在这一档从 20px 收到 14px，表格首尾两列必须**跟着收**。
+   * ⚠️ 不写这几行，基础和窄屏就会打架：基础规则是 `:first-child`（0,2,2），
+   * 而 `@560` 里的 `.grid tbody td` 只有 (0,1,2)——**媒体查询不提高优先级**，
+   * 于是 20px 会一路漏到 560 那档，整张表在窄屏上左右各多出一道明显的空白。
+   */
+  .grid thead th:first-child,
+  .res-grid thead th:first-child,
+  .grid tbody td:first-child,
+  .res-grid tbody td:first-child { padding-left: 14px; }
+
+  .grid thead th:last-child,
+  .res-grid thead th:last-child,
+  .grid tbody td:last-child,
+  .res-grid tbody td:last-child { padding-right: 14px; }
+
+  #screen-wizard { padding: 0 14px 20px; }
+
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .ops { justify-content: flex-start; }
+  .grid .c-ops { width: auto; }
+  /* ★ 身份列在窄屏上给得比桌面还紧一点，但不能小到把打码密钥截断——
+     那一格现在是这张表的主语。 */
+  .res-grid .r-ident { width: 176px; }
+  .res-grid .r-url { width: auto; }
+  .res-grid .r-priority { width: auto; }
+  .res-grid .r-count { width: auto; }
+  .res-grid .r-usage { width: auto; }
+  .res-grid .r-cost { width: auto; }
+  .res-grid .r-ops { width: auto; }
+  .foot { padding: 9px 14px; }
+}
+
+/* 最窄的一档：操作列里的文字按钮改成图标式排布，让目录仍有宽度 */
+@media (max-width: 560px) {
+  .grid tbody td { padding: 6px 8px; }
+  .grid thead th { padding: 8px; }
+  .grid .c-status { width: 104px; }
+  .grid .c-token { width: 120px; }
+  .ident-src { display: none; }
+  .pathrow { flex-wrap: wrap; }
+  .pathrow input { flex: 1 1 100%; }
+  .srow { grid-template-columns: 12px 80px minmax(0, 1fr) auto auto; }
+  .srow .mini:nth-last-child(1) { grid-column: 4 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

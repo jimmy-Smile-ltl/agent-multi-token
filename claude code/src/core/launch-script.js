@@ -1,0 +1,232 @@
+// @ts-check
+/**
+ * launch 脚本——**兜底产物**（§2.10）。
+ *
+ * ─────────────────────────────────────────────────────────────
+ * **首选路径是「不生成脚本」**：直接 `platform.spawnTerminal({ title, cwd, argv })`，
+ * argv 一路是数组、不被任何 shell 解析。那样消灭了整整一类问题：
+ * 无 shell 解析、无转义、无代码页。
+ *
+ * **只有三种情况才落到这里**：
+ *   ① 终端只接受命令字符串（macOS `osascript`、Windows `cmd /c start`）
+ *   ② 终端没有 cwd 选项（如 `xterm`）
+ *   ③ `--print`，或用户要手工重跑
+ * ─────────────────────────────────────────────────────────────
+ *
+ * 本模块是**纯函数**：把 `{nodePath, cmtPath, tokenName, model, cwd, ...}` 变成
+ * 一段文本 + 一个路径，不碰 fs、不读 `process.*`。落盘是 cli 层调 `store.writeTextFile()` 的事。
+ *
+ * ## 内容契约（§2.10：**只允许**包含这四件事）
+ *
+ * 1. **绝对路径调用**：`node` 用 `process.execPath`、cmt 入口用 `import.meta.url` 换算的绝对路径。
+ *    **任何一步都不依赖 PATH**——新终端的 PATH 与启动时可能不同。
+ * 2. **不放 cwd**（由终端的 cwd 参数传入）。只有 ①/② 兜底路径下才写 `cd`，
+ *    此时 `cmt doctor` 要标注编码风险。
+ * 3. **参数透传**：cmd 用 `%*`，sh 用 `"$@"`。
+ * 4. **不出现任何密钥**（§2.7 铁律）。
+ *    本模块的结构保证了这一点：入参里**根本没有** authToken 这个字段，
+ *    脚本只是回头调用 `cmt exec`，由后者在进程内注入环境。
+ *    `--url` / `--auth-mode` 是**非密钥**的覆盖项，可以内联（`--url` 常常写成
+ *    `${RELAY_BASE_URL}` 这类引用串——引用跨得过进程边界，密钥跨不过：求值发生
+ *    在新窗口里）。`--token-value` 则**故意没有这个参数**，`cmt run` 见到它就报错。
+ *
+ *    ⚠️ `--url` 有个**例外**：`https://user:pass@host/…` 里的 userinfo **就是凭证**，
+ *    内联它等于把密钥写进脚本。判据是 `urlCarriesCredential()`，`cmt run` 见到
+ *    这种值同样报错——`--url` 是"非密钥覆盖项"这句话**只对不带 userinfo 的值成立**。
+ */
+import { CmtError } from './errors.js';
+import { launchScriptPath, profileNameFor } from './paths.js';
+import { parseEnvRef } from './resolve.js';
+
+/**
+ * `.cmd` 里双引号包裹一个字面量。
+ *
+ * cmd 的坑：`%` **即使在双引号内也会展开**，所以必须写成 `%%`。
+ * 注意 `%*`（参数透传）是**故意**不加引号也不转义的，所以它在别处单独拼。
+ * @param {string} s
+ */
+export function cmdQuote(s) {
+  // Windows 文件名不允许含 `"`，所以这里不需要处理引号转义；
+  // 真出现了就是配置里塞了脏数据，直接让 cmd 报错比静默改写更诚实。
+  return `"${String(s).replace(/%/g, '%%')}"`;
+}
+
+/**
+ * `.sh` 里单引号包裹一个字面量。
+ *
+ * POSIX 单引号内一切字面量，除了 `'` 本身——用 `'\''` 收尾-转义-重开。
+ * @param {string} s
+ */
+export function shQuote(s) {
+  return `'${String(s).replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * 是否含非 ASCII 字符（`cmt doctor` 的编码风险判据）。
+ * @param {string} s
+ */
+export function hasNonAscii(s) {
+  // eslint-disable-next-line no-control-regex
+  return /[^\x00-\x7F]/.test(String(s));
+}
+
+/**
+ * 这个 `--url` 值里**带了凭证**吗（`https://user:pass@host/…`）？
+ *
+ * §2.7 铁律：launch 脚本里不许出现密钥。而 URL 的 userinfo 段**就是**凭证本身，
+ * 所以这种值不能内联进脚本——`cmt run` 见到它就报错（见本文件头部契约 4）。
+ * `cmt exec` 不受影响：它只把值注入进程环境，不落盘。
+ *
+ * 两个刻意的边界：
+ *
+ * · **整串 `${VAR}` 引用不算**。引用不是密钥，它跨得过进程边界；求值发生在新窗口里，
+ *   磁盘上留下的只有 `${VAR}` 五个字符。这条边界必须留着，否则
+ *   `--url '${RELAY_URL}'`（我们推荐的写法）反而会被拒。
+ * · **只在 authority 段里找 `@`**，即 `scheme://` 之后到第一个 `/`、`?`、`#` 为止。
+ *   `https://host/path@2x.png` 里的 `@` 是路径的一部分，不是 userinfo——
+ *   按整串找 `@` 会把正常 URL 误判。
+ *
+ * 不猜不是 URL 的值：没有 `scheme://` 前缀就返回 `false`（`ANTHROPIC_BASE_URL`
+ * 本来就该是个完整 URL，形状不对是另一类问题，`validate.js` 管）。
+ *
+ * @param {string} raw
+ * @returns {boolean}
+ */
+export function urlCarriesCredential(raw) {
+  const s = String(raw ?? '');
+  if (parseEnvRef(s)) return false;
+  const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(s);
+  return m ? m[1].includes('@') : false;
+}
+
+/**
+ * 生成一份 launch 脚本的**规格**（路径 + 内容 + 权限位 + 警告）。
+ *
+ * @param {{
+ *   platform: NodeJS.Platform,
+ *   home: string,
+ *   tokenName?: string | null,
+ *   nodePath: string,
+ *   cmtPath: string,
+ *   model?: string | null,
+ *   url?: string | null,
+ *   authMode?: string | null,
+ *   cwd: string,
+ *   cont?: boolean,
+ *   needCd?: boolean,
+ * }} opts
+ * @returns {{ path: string, content: string, mode: number, warnings: string[] }}
+ */
+export function buildLaunchScript({
+  platform,
+  home,
+  tokenName = null,
+  nodePath,
+  cmtPath,
+  model = null,
+  url = null,
+  authMode = null,
+  cwd,
+  cont = false,
+  needCd = false,
+}) {
+  if (!nodePath) {
+    throw new CmtError('生成 launch 脚本需要 node 的绝对路径', {
+      hint: '这是内部错误：调用方应传 process.execPath',
+    });
+  }
+  if (!cmtPath) {
+    throw new CmtError('生成 launch 脚本需要 cmt 入口的绝对路径', {
+      hint: '这是内部错误：调用方应用 fileURLToPath(import.meta.url) 换算',
+    });
+  }
+  if (!cwd) {
+    throw new CmtError('生成 launch 脚本需要工作目录', {
+      hint: '先确定四要素里的「本地路径」',
+    });
+  }
+
+  const isWin = platform === 'win32';
+  const profileName = profileNameFor(tokenName);
+
+  // ── 参数序列：与「直接拉起」路径的 argv **完全一致**（脚本是首选路径的忠实序列化）──
+  // 于是"手工重跑脚本"与"cmt run"跑的是同一条命令，不会出现两套语义。
+  // ⚠️ 这条序列在下面两个分支里**各写了一遍**（cmd / sh 的引号规则不同，没法合并）。
+  //    改动时两边都要改，并与 `run.js` 里那第三处 argv 对齐——它们曾经漂移过：
+  //    `cmt run --url X` 显示的与实际启动的不一致（`--url` / `--auth-mode` 被漏掉）。
+  //    [exec] [<token>] [--model m] [--url u] [--auth-mode a] [-c]
+  // 这里**没有** `--token-value`，是故意的——见本文件头部契约 4。
+
+  /** @type {string[]} */
+  const lines = [];
+  /** @type {string[]} */
+  const warnings = [];
+
+  if (isWin) {
+    lines.push('@echo off');
+    // ⚠️ 注释也用 ASCII：.cmd 的**整个文件**都该是纯 ASCII。
+    // 中文 Windows 的 cmd 默认跑在 OEM 代码页（936），UTF-8 的中文注释
+    // 会让 cmd 把后面的字节也读花——路径再 ASCII 也救不回来。
+    lines.push('rem Auto-generated by cmt. Regenerated on every `cmt run`; manual edits are overwritten.');
+    if (needCd) {
+      lines.push(`cd /d ${cmdQuote(cwd)}`);
+      warnings.push(...encodingRisk(cwd, '工作目录'));
+    }
+    // 固定关键字（exec / --model / --url / --auth-mode / -c / --）不引号；值一律引号包裹
+    const parts = [cmdQuote(nodePath), cmdQuote(cmtPath), 'exec'];
+    if (tokenName) parts.push(cmdQuote(tokenName));
+    if (model) parts.push('--model', cmdQuote(model));
+    if (url) parts.push('--url', cmdQuote(url));
+    if (authMode) parts.push('--auth-mode', cmdQuote(authMode));
+    if (cont) parts.push('-c');
+    // `--` 之后才是透传区：`cmt exec` 自己的解析器会拒收陌生选项，
+    // 少了这个分隔符，`launch.cmd --verbose` 会死在 "未知选项 --verbose" 上。
+    // %* 原样透传——**不能**经过 cmdQuote，否则会变成 %%*（字面量）
+    lines.push(`${parts.join(' ')} -- %*`);
+  } else {
+    lines.push('#!/bin/sh');
+    lines.push('# Auto-generated by cmt. Regenerated on every `cmt run`; manual edits are overwritten.');
+    if (needCd) lines.push(`cd ${shQuote(cwd)}`);
+    const parts = [shQuote(nodePath), shQuote(cmtPath), 'exec'];
+    if (tokenName) parts.push(shQuote(tokenName));
+    if (model) parts.push('--model', shQuote(model));
+    if (url) parts.push('--url', shQuote(url));
+    if (authMode) parts.push('--auth-mode', shQuote(authMode));
+    if (cont) parts.push('-c');
+    // exec 顶掉 shell 本身，别让一个多余的 sh 挂着等 claude 退出。
+    // `--` 同 Windows 分支：把透传区与 cmt 自己的选项隔开。
+    lines.push(`exec ${parts.join(' ')} -- "$@"`);
+  }
+
+  // ── 编码风险：中文 Windows 的 cmd 默认 OEM 代码页会把 UTF-8 路径读花 ──
+  if (isWin) {
+    warnings.push(...encodingRisk(nodePath, 'node 路径'));
+    warnings.push(...encodingRisk(cmtPath, 'cmt 入口路径'));
+    // `--url` 也是被写进脚本的值，同样受代码页影响（`--auth-mode` 只有 token|key 两个值）
+    if (url) warnings.push(...encodingRisk(url, 'API 端点'));
+  }
+
+  // ── 换行符（§2.10）：.cmd 必须 CRLF，.sh 必须 LF ──────────────────
+  const eol = isWin ? '\r\n' : '\n';
+
+  return {
+    path: launchScriptPath(home, profileName, platform),
+    content: lines.join(eol) + eol,
+    mode: isWin ? 0o644 : 0o755,
+    warnings,
+  };
+}
+
+/**
+ * 非 ASCII → 一条警告（走"直接拉起"路径就没有这个问题）。
+ * @param {string} value
+ * @param {string} what
+ * @returns {string[]}
+ */
+function encodingRisk(value, what) {
+  if (!hasNonAscii(value)) return [];
+  return [
+    `${what}含非 ASCII 字符（${value}），launch.cmd 在中文 Windows 上可能读花——` +
+      '建议改用直接拉起（去掉 --print / 换一个支持 cwd 参数的终端）',
+  ];
+}

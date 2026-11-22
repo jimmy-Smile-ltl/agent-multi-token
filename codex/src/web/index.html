@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  ★ 工具名不在这里——`<title>` 与页头那个名字都由 `app.js` 从视图模型的
+    `appName` 填。这样同一份文件在两个项目里能逐字一致（「共享文件」那一节）。
+
+  ★★ 三条禁令（CSP `script-src 'self'` / `style-src 'self'`）：
+     ① 不许内联 `<script>`；② 不许内联 `<style>`；③ 不许 `on*=` 属性。
+     违反的表现是**页面白屏**，不是报错——所以它有一条测试盯着。
+     同理**不许 `style="…"` 属性**（CSP 一样毙掉）：要变的样子全走 class。
+
+  ★ 页面的骨架是**工作台**：左边一栏管"按什么看"（状态筛选），右边一张表
+    管"看到什么"。小于 860px 时左栏折成顶部横条（样式里那条 `@media`）。
+
+  ⚠️ 这里每个 `id` 都必须被 `app.js` 用到，反过来也一样——有一条测试
+    **双向**对账（「前端资产」那一节第 5 条）。死 id 不致命，但它会让下一个
+    读这段标记的人以为它还有用。
+-->
+<title>控制台</title>
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body class="booting">
+
+<div class="shell">
+
+  <!-- ═══════════════════════════ 左栏 ═══════════════════════════ -->
+  <aside class="side">
+    <div class="brand">
+      <span class="mark" id="app-name"></span>
+      <span class="sub">工作台</span>
+    </div>
+
+    <!-- ★ 两个视图：项目（绑定表）与资源（身份表）。
+         切换是**纯前端**的——两份数据本来就在同一个视图模型里，点了只重画，
+         不发请求。所以这两颗按钮不进视图模型，也不产生任何写盘动作。 -->
+    <div class="views" id="views" role="group" aria-label="视图">
+      <button type="button" class="view-tab is-on" id="view-projects" aria-pressed="true">项目</button>
+      <button type="button" class="view-tab" id="view-resources" aria-pressed="false">资源</button>
+    </div>
+
+    <!-- 状态筛选。计数与每一档都由 `app.js` 画（状态表是可配置的，
+         这里写死五档就会在用户加了一档之后少一行）。
+         ★ 状态只描述**项目**；资源视图里这一整块藏起来。 -->
+    <nav class="side-block" id="nav-status" aria-label="按状态筛选">
+      <div class="side-head">状态</div>
+      <ul class="filters" id="filters"></ul>
+      <button type="button" id="status-manage" class="linkish">管理状态…</button>
+    </nav>
+
+    <div class="side-block side-tail">
+      <div class="side-head">当前目录</div>
+      <p class="cwd" id="cwd"></p>
+      <button type="button" id="act-quit" class="wide">退出控制台</button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════ 右栏 ═══════════════════════════ -->
+  <div class="pane">
+
+    <header class="top">
+      <div class="top-title">
+        <h1 id="pane-title"></h1>
+        <span class="count-chip" id="list-count"></span>
+      </div>
+      <div class="actions">
+        <button type="button" id="act-sync" hidden>重算用量</button>
+        <button type="button" id="act-check-all" hidden>全部检测</button>
+        <button type="button" id="act-fetch-all" hidden>全部拉取</button>
+        <button type="button" id="act-defaults-env" hidden>默认环境</button>
+        <button type="button" id="act-add-token" class="primary" hidden>＋ 添加 token</button>
+        <button type="button" id="act-reload">刷新</button>
+        <button type="button" id="act-new" class="primary">＋ 新建</button>
+      </div>
+    </header>
+
+    <!-- 载入中 / 断线 / 上一步做了什么，都走这一条 -->
+    <p class="flash" id="flash" role="status" aria-live="polite" hidden></p>
+
+    <!-- ★ 删除确认走**行内横幅**，不用 `window.confirm()`：那个框冻住事件循环，
+         而且没有任何测试框架点得到它（视图模型的 `confirm` 就是为这条准备的）。 -->
+    <div class="banner" id="banner" hidden>
+      <span class="banner-text" id="banner-label"></span>
+      <span class="grow"></span>
+      <button type="button" id="banner-yes" class="danger">删除</button>
+      <button type="button" id="banner-no">取消</button>
+    </div>
+
+    <main class="body">
+
+      <!-- ★ 「需要你处理」：服务端算好的注意力清单（每条带动作按钮）。
+           健康时整块隐藏、不占一行；条目与动作都由视图模型给，页面只画。 -->
+      <div class="attention" id="attention" hidden></div>
+
+      <!-- ═══════════════════════ 屏 1：项目表 ═══════════════════════ -->
+      <section id="screen-list" hidden>
+        <!-- ★ 表格自己滚，页面不滚：宽窗口下"横向滚动条出现在整页底部"
+             是最难看的一种错位。 -->
+        <div class="tablewrap">
+          <table class="grid">
+            <caption class="sr-only">项目列表</caption>
+            <thead>
+              <tr>
+                <th class="c-status">状态</th>
+                <th class="c-target">目录</th>
+                <th class="c-token">身份</th>
+                <th class="c-url">服务端</th>
+                <th class="c-models">模型</th>
+                <th class="c-ops">操作</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════ 屏 1b：资源表 ═══════════════════════
+           ★ 这张表的列名用**独立的 `r-*`**，不蹭左边的 `c-*`：两张表列宽
+             不同，蹭了会被"窄屏藏某一列"的规则一起误伤（藏掉表头、留下数据，
+             整张表当场错位）。 -->
+      <section id="screen-resources" hidden>
+        <!-- ★ 会话条（面板 · 会话在场层）：现在有谁在跑、谁有未读纸条。
+             全部健康且无未读时折叠成一行计数（健康态不占地方）；
+             内容由 `paintSessions()` 填，没有活会话时整条隐藏。 -->
+        <div class="res-sessions" id="res-sessions" hidden></div>
+        <!-- ★ 概览条：池状态计数 + 用量合计 + 至多两条提示。数字全由服务端算好
+             （`resourcesSummary`），这里**只画不翻**——页面自己再归类一遍就会
+             与命令行 `pool sync` 的口径分叉。内容由 `paintSummary()` 填，空池时整条隐藏。 -->
+        <div class="res-summary" id="res-summary" hidden></div>
+        <div class="tablewrap">
+          <table class="res-grid">
+            <caption class="sr-only">身份与服务端</caption>
+            <thead>
+              <tr>
+                <th class="r-ident">身份（token）</th>
+                <th class="r-url">服务端</th>
+                <th class="r-priority">模型优先级</th>
+                <th class="r-count">绑定数</th>
+                <th class="r-usage">用量</th>
+                <th class="r-cost">花费</th>
+                <th class="r-ops">操作</th>
+              </tr>
+            </thead>
+            <tbody id="res-rows"></tbody>
+          </table>
+        </div>
+      </section>
+      <section id="screen-wizard" hidden>
+        <div class="wizard-bar">
+          <button type="button" id="wiz-back">← 返回</button>
+          <ol class="steps" id="steps" aria-label="配置步骤"></ol>
+        </div>
+
+        <p class="flash inline" id="wizard-flash" role="status" aria-live="polite" hidden></p>
+
+        <div class="fieldsets">
+
+          <!-- ── 1 目标路径 ── -->
+          <fieldset id="fs-path">
+            <legend><span class="n">1</span> 目标路径</legend>
+
+            <!-- ★ 这层是 `div`，不是 `label`：里面有两个按钮，包在 `<label>` 里
+                 点它们会顺带把焦点塞进输入框（`label` 的点击默认行为）。 -->
+            <div class="field">
+              <span class="lab">目录</span>
+              <div class="pathrow">
+                <input type="text" id="path-text" spellcheck="false" autocomplete="off"
+                       placeholder="C:\… 或 ~/…">
+                <button type="button" id="path-copy" title="把框里的路径复制下来">复制</button>
+                <button type="button" id="path-open" title="在系统的文件管理器里打开这个目录">打开</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <span class="lab">子目录 <span class="hint" id="path-pending"></span></span>
+              <select id="path-dirs" size="6"></select>
+            </div>
+
+            <div class="row-ops">
+              <button type="button" id="path-enter">进入</button>
+              <button type="button" id="path-next" class="primary">下一步</button>
+            </div>
+          </fieldset>
+
+          <!-- ── 2 身份 ── -->
+          <fieldset id="fs-token">
+            <legend><span class="n">2</span> 身份与服务端</legend>
+
+            <label class="field" id="token-pick-box">
+              <span class="lab">用哪个身份</span>
+              <select id="token-pick"></select>
+            </label>
+
+            <!-- ★★ 地址与身份**成对**：
+                 · 选了身份 → 地址跟着换成它自己的；
+                 · 选了/敲了另一个地址 → 身份跟着切过去；
+                 · 这个地址谁都没用过 → 它就是要写回那个身份的新值。
+                 前两种不写回，第三种在第 4 步写回 `tokens/<名字>.json`。 -->
+            <label class="field">
+              <span class="lab">服务端地址</span>
+              <select id="token-url"></select>
+            </label>
+
+            <label class="field" id="token-url-custom-box" hidden>
+              <span class="lab">自定义地址</span>
+              <input type="text" id="token-url-custom" spellcheck="false" autocomplete="off"
+                     placeholder="scheme://host/path">
+            </label>
+
+            <div class="row-ops" id="token-pick-ops">
+              <button type="button" id="token-new">＋ 新建身份</button>
+              <button type="button" id="token-next" class="primary">下一步</button>
+            </div>
+
+            <div class="newbox" id="token-newbox" hidden>
+              <label class="field">
+                <span class="lab">名字</span>
+                <input type="text" id="token-name" spellcheck="false" autocomplete="off"
+                       placeholder="relay-a">
+              </label>
+
+              <label class="field">
+                <span class="lab">密钥</span>
+                <input type="password" id="token-secret" autocomplete="new-password"
+                       placeholder="sk-…">
+              </label>
+              <p class="hint" id="token-len"></p>
+
+              <div class="row-ops">
+                <button type="button" id="token-save" class="primary">保存并继续</button>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- ── 3 模型 ── -->
+          <fieldset id="fs-models">
+            <legend><span class="n">3</span> 模型</legend>
+
+            <p class="hint" id="models-state"></p>
+            <!-- ★ 回执单独一行：拉取失败时那一行是红的，成功回执照抄进去就成了红字 -->
+            <p class="hint" id="models-notice" hidden></p>
+
+            <div class="row-ops">
+              <button type="button" id="models-retry">重新拉取</button>
+            </div>
+
+            <div class="cols">
+              <div class="col">
+                <h4>可选</h4>
+                <ul class="checks" id="models-list"></ul>
+              </div>
+              <div class="col">
+                <h4>已选（按优先级）</h4>
+                <ol class="picked" id="models-picked"></ol>
+              </div>
+            </div>
+
+            <div class="inline">
+              <input type="text" id="model-manual" spellcheck="false" autocomplete="off"
+                     placeholder="手敲一个模型 id">
+              <button type="button" id="model-add">加入</button>
+            </div>
+
+            <!-- ★ 终端上这一步靠 `Enter` 往下走，网页上没有"回车就走"这回事——
+                 少了这颗按钮，第 3 步就是个死胡同（勾完模型也到不了第 4 步）。
+                 `wizard.edit` 时藏起来：那时候第 3 步就是最后一步，下面那颗「写入」才是出口。 -->
+            <div class="row-ops" id="models-next-box">
+              <button type="button" id="models-next" class="primary">下一步</button>
+            </div>
+
+            <!-- ★ 只给「改模型」那条短路用（`wizard.edit`）——那时候没有第 4 步。 -->
+            <div class="row-ops" id="edit-apply-box" hidden>
+              <button type="button" id="edit-apply" class="primary big">写入</button>
+            </div>
+          </fieldset>
+
+          <!-- ── 4 落点 ── -->
+          <fieldset id="fs-apply">
+            <legend><span class="n">4</span> 落点</legend>
+
+            <dl class="summary" id="apply-summary"></dl>
+
+            <div class="row-ops">
+              <button type="button" id="apply-go" class="primary big">写入</button>
+            </div>
+          </fieldset>
+
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="foot">
+      <span class="dot" aria-hidden="true"></span>
+      <span>本地控制台 · 只听回环地址 · 关掉页面不会退出 · 空闲自动退出</span>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══════════════════ 状态管理（原生 <dialog>） ═══════════════════
+
+     ★ 用 `<dialog>` + `showModal()` 而不是自己搭一个遮罩：焦点陷阱、
+       Esc 关闭、`::backdrop` 都是浏览器给的，一行脚本都不用写。
+
+     ★ 客户端**攒着改**，一次「保存」才提交——每敲一个字就写一次盘，
+       等于把半成品的名字也写进去。 -->
+<dialog id="status-dialog" class="sheet">
+  <h2>管理状态</h2>
+  <p class="hint">每个状态一个名称与一种颜色。至少留一档；还有项目在用的删不掉。</p>
+
+  <ul class="status-edit" id="status-edit"></ul>
+  <p class="hint bad" id="status-error" hidden></p>
+
+  <p class="file-hint" id="status-file"></p>
+
+  <div class="sheet-ops">
+    <button type="button" id="status-add">＋ 添加一档</button>
+    <span class="grow"></span>
+    <button type="button" id="status-cancel">取消</button>
+    <button type="button" id="status-save" class="primary">保存</button>
+  </div>
+</dialog>
+
+<!-- ═══════════════════ 模型优先级（原生 <dialog>） ═══════════════════
+
+     ★ 草稿全在**前端**：↑↓ 调序、× 删除、填一个 id 加入，点「保存」才提交。
+       整轮交互只发一条 `save-priority`——每动一下就写盘，等于把半截列表也写进去。
+
+     ★ 候选由服务端给（资源表里出现过的 id ∪ 本行优先级），前端**不查网络**：
+       这个对话框不该有"打开就转圈"的状态，拉取是资源表那一列的事。
+
+     ★ 顺序就是优先级，`①②③` 是**语义**不是装饰：第一个是默认模型。 -->
+<dialog id="priority-dialog" class="sheet prio">
+  <h2>模型优先级</h2>
+  <p class="hint prio-who" id="pr-title"></p>
+  <p class="hint">从上到下就是优先级，第一个是默认模型。空列表 = 回到继承。</p>
+
+  <ol class="pr-list" id="pr-list"></ol>
+
+  <div class="pr-addrow">
+    <!-- ★ `autofocus` 不是装饰：`<dialog>` 打开时浏览器会把焦点交给第一个可聚焦的
+         元素——那就是第 1 行的 `↓`（`↑` 是禁用的），一进来就顶着一圈深色焦点环，
+         像是被误触。焦点落在输入框上，最常见的动作（加一个模型）也少按一次 Tab。 -->
+    <input type="text" id="pr-new" list="pr-candidates" placeholder="模型 id"
+           autocomplete="off" spellcheck="false" autofocus>
+    <datalist id="pr-candidates"></datalist>
+    <button type="button" id="pr-add">加入</button>
+  </div>
+
+  <label class="pr-gate" id="pr-gate-wrap" hidden>
+    <input type="checkbox" id="pr-gateway">
+    <span id="pr-gate-text"></span>
+  </label>
+
+  <p class="hint bad" id="pr-error" hidden></p>
+
+  <div class="sheet-ops">
+    <span class="grow"></span>
+    <button type="button" id="pr-cancel">取消</button>
+    <button type="button" id="pr-save" class="primary">保存</button>
+  </div>
+</dialog>
+
+<!-- ═══════════════════ 添加 token（原生 <dialog>） ═══════════════════
+
+     ★ 资源板块自己的入口——空表时不必切回项目屏走向导第 2 步。
+       建的动作在服务端复用向导那条路，这里只收三样：名字、密钥、可选的服务端地址。
+
+     ★ 密钥框是 `type="password"`：肩窥场景下输入时就该是圆点；
+       落盘后回执视图里只有打码值，明文永不过线。 -->
+<dialog id="add-dialog" class="sheet">
+  <h2>添加 token</h2>
+  <p class="hint">名字是小写字母/数字开头，可用 `-` 和 `_`；密钥只在保存这一趟发出。</p>
+
+  <div class="field">
+    <label class="lab" for="ad-name">名字</label>
+    <input type="text" id="ad-name" autocomplete="off" spellcheck="false" autofocus
+           placeholder="relay-a">
+  </div>
+
+  <div class="field">
+    <label class="lab" for="ad-secret">密钥</label>
+    <input type="password" id="ad-secret" autocomplete="off" placeholder="sk-…">
+  </div>
+
+  <div class="field">
+    <label class="lab" for="ad-url">服务端地址（可选）</label>
+    <input type="text" id="ad-url" autocomplete="off" spellcheck="false"
+           placeholder="https://…/v1">
+  </div>
+
+  <p class="hint bad" id="ad-error" hidden></p>
+
+  <div class="sheet-ops">
+    <span class="grow"></span>
+    <button type="button" id="ad-cancel">取消</button>
+    <button type="button" id="ad-save" class="primary">保存</button>
+  </div>
+</dialog>
+
+<!-- ═══════════════════ 环境变量编辑器（原生 <dialog>） ═══════════════════
+
+     ★ env 逃生舱的图形入口：注入面写死的那些盖不住每一种情况，这一格
+       允许用户自己写。行内「环境」按钮编辑单个 token 的本层 env；
+       资源屏表头「默认环境」编辑全局 defaults 那份。
+
+     ★ textarea 承载 **JSON 文本草稿**（带缩进，方便手改）；`JSON.parse`
+       的早反馈在保存前一拍给出，正式校验只在服务端。`{}` = 删键（回继承）；
+       值为空串的键 = 注入时删掉继承来的那个变量——对话框的提示写明这两条。 -->
+<dialog id="env-dialog" class="sheet">
+  <h2>环境变量</h2>
+  <p class="hint prio-who" id="env-title"></p>
+  <p class="hint">JSON 对象：键是变量名，值必须是字符串。值留空串 = 注入时删掉
+    继承来的那个变量；整个 `{}` = 回到继承。</p>
+
+  <textarea id="env-text" rows="10" autocomplete="off" spellcheck="false"
+            placeholder='{"FOO": "1"}'></textarea>
+
+  <p class="hint bad" id="env-error" hidden></p>
+
+  <div class="sheet-ops">
+    <span class="grow"></span>
+    <button type="button" id="env-cancel">取消</button>
+    <button type="button" id="env-save" class="primary">保存</button>
+  </div>
+</dialog>
+
+</body>
+</html>

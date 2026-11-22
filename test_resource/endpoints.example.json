@@ -1,0 +1,26 @@
+{
+  "_note": "占位模板——结构与 endpoints.json 完全一致，值全是假的。真值写在同目录的 endpoints.json（已被 .gitignore 排除）。",
+  "baseUrl": "https://relay.example.com/v1",
+  "models": [
+    "example-model-large",
+    "example-model-small"
+  ],
+  "usageUrl": "https://relay.example.com/mine",
+  "probe": {
+    "endpoint": "/chat/completions",
+    "authHeader": "Authorization: Bearer <sk>",
+    "minimalBody": {
+      "model": "example-model-large",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ]
+    }
+  },
+  "errorSignatures": {
+    "insufficient_user_quota": "额度用完",
+    "invalid_api_key": "密钥无效"
+  }
+}

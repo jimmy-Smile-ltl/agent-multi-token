@@ -1,0 +1,31 @@
+{
+  "name": "claude-multi-token",
+  "version": "0.1.0",
+  "description": "把全局唯一的环境变量组变成按路径解析的配置：一个会话一个 token 的 Claude Code 多开管理器（默认同一窗口多标签页）",
+  "type": "module",
+  "bin": {
+    "cmt": "./bin/cmt.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "README.zh-CN.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "cli",
+    "anthropic",
+    "multi-account",
+    "proxy"
+  ],
+  "license": "MIT",
+  "dependencies": {}
+}
